@@ -8,7 +8,7 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const dataPath = path.join(__dirname, "data", "students.json");
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
@@ -21,6 +21,7 @@ function isValidStudentId(id) {
   return regex.test(id);
 }
 
+export { isValidStudentId };
 
 // Load students from JSON
 export function loadStudents() {

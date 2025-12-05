@@ -1,6 +1,6 @@
 import express from "express";
 import path from "path";
-import { loadStudents, saveStudents } from "../server.js";
+import { loadStudents, saveStudents, isValidStudentId } from "../server.js";
 
 
 const router = express.Router();
@@ -62,7 +62,7 @@ router.put("/:id", (req, res) => {
     if (!validGrades) return res.status(400).json({ error: "Invalid grades format" });
     // Append new grades instead of overwriting
     grades.forEach(g => student.grades.push(g));
-}
+  }
   saveStudents(students);
   res.json(student);
 });
