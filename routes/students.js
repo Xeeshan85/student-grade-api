@@ -1,112 +1,124 @@
-import express from 'express';
-import fs from 'fs';
-import path from 'path';
-import { loadStudentsFromFile, saveStudentsToFile } from '../server.js';
+import express from "express";
+import path from "path";
+import { loadStudents, saveStudents } from "../server.js";
 
-// const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
 const router = express.Router();
-// const dataPath = path.join(__dirname, '../data', 'students.json');
-const dataPath = path.resolve('./data/students.json');
+const dataPath = path.resolve("./data/students.json");
 
-// const rawData = fs.readFileSync(dataPath, 'utf-8');
-// const students = JSON.parse(rawData);
-
-// Get all students
-router.get('/', (req, res) => {
+// GET /students – Get all students
+router.get("/", (req, res) => {
+  const students = loadStudents();
   res.json(students);
 });
 
-// Get a student by ID
-router.get('/:id', (req, res) => {
-  const studentId = req.params.id;
-  const student = students.find(s => s.id === studentId);
+// GET /students/:id – Get a student by ID
+router.get("/:id", (req, res) => {
+  const students = loadStudents();
+  const student = students.find((s) => s.id === req.params.id);
   if (student) {
     res.json(student);
   } else {
-    res.status(404).json({ message: 'Student not found' });
+    res.status(404).json({ error: "Student not found" });
   }
 });
 
-router.post('/', (req, res) => {
+// POST /students – Add a new student
+router.post("/", (req, res) => {
+  const students = loadStudents();
   const { id, name, grades } = req.body;
+
+  if (!isValidStudentId(id)) {
+    return res.status(400).json({ error: "Invalid student ID format. Use S2025XXXX" });
+  }
   if (!id || !name || !grades) {
-    return res.status(400).json({ message: 'Missing required student fields' });
+    return res.status(400).json({ error: "Missing required fields" });
   }
-  if (students.find(s => s.id === id)) {
-    return res.status(409).json({ message: 'Student with this ID already exists' });
+  if (students.some((s) => s.id === id)) {
+    return res.status(400).json({ error: "Student ID already exists" });
   }
-    const newStudent = { id, name, grades };
-    students.push(newStudent);
-    saveStudentsToFile();
-    res.status(201).json(newStudent);
+  if (!Array.isArray(grades) || !grades.every(g => g.subject && typeof g.subject === "string" && typeof g.score === "number" && g.score >= 0 && g.score <= 105)) {
+    return res.status(400).json({ error: "Invalid grades format" });
+  }  
+  const newStudent = { id, name, grades };
+  students.push(newStudent);
+  saveStudents(students);
+
+  res.status(201).json(newStudent);
 });
 
-// PUT /students/:id - Update a student by ID
-router.put('/:id', (req, res) => {
-  const studentId = req.params.id;
-  const updatedStudent = req.body;
-  const index = students.findIndex(s => s.id === studentId);
-  if (index !== -1) {
-    students[index] = updatedStudent;
-    saveStudentsToFile();
-    res.json(updatedStudent);
-  } else {
-    res.status(404).json({ message: 'Student not found' });
-  }
+// PUT /students/:id – Update a student by ID
+router.put("/:id", (req, res) => {
+  const students = loadStudents();
+  const student = students.find((s) => s.id === req.params.id);
+
+  if (!student) return res.status(404).json({ error: "Student not found" });
+
+  const { name, grades } = req.body;
+  if (name) student.name = name;
+  if (grades) student.grades = grades;
+  if (grades && Array.isArray(grades)) {
+    const validGrades = grades.every(g => g.subject && typeof g.subject === "string" && typeof g.score === "number" && g.score >= 0 && g.score <= 105);
+    if (!validGrades) return res.status(400).json({ error: "Invalid grades format" });
+    // Append new grades instead of overwriting
+    grades.forEach(g => student.grades.push(g));
+}
+  saveStudents(students);
+  res.json(student);
 });
 
-// DELETE /students/:id - Delete a student by ID
-router.delete('/:id', (req, res) => {
-  const studentId = req.params.id;
-  const index = students.findIndex(s => s.id === studentId);
-  if (index !== -1) {
-    const deletedStudent = students.splice(index, 1);
-    saveStudentsToFile();
-    res.json(deletedStudent[0]);
-  } else {
-    res.status(404).json({ message: 'Student not found' });
-  }
-});
+// PATCH /students/:id/grades – Add grades to a student
+router.patch("/:id/grades", (req, res) => {
+    const students = loadStudents();
+    const student = students.find((s) => s.id === req.params.id);
 
-// GET /students/:id/grades - Get all grades for a student
-router.get('/:id/grades', (req, res) => {
-  const studentId = req.params.id;
-  const student = students.find(s => s.id === studentId);
-  if (student) {
-    res.json(student.grades);
-  } else {
-    res.status(404).json({ message: 'Student not found' });
-  }
-});
+    if (!student) return res.status(404).json({ error: "Student not found" });
 
-// GET /students/:id/grades/:subject - Get a specific grade for a student
-router.get('/:id/grades/:subject', (req, res) => {
-  const studentId = req.params.id;
-  const subject = req.params.subject;
-  const student = students.find(s => s.id === studentId);
-  if (student) {
-    const grade = student.grades.find(g => g.subject === subject);
-    if (grade) {
-      res.json(grade);
-    } else {
-      res.status(404).json({ message: 'Grade not found for the specified subject' });
+    const { grades } = req.body;
+    if (grades && Array.isArray(grades)) {
+        const validGrades = grades.every(g => g.subject && typeof g.subject === "string" && typeof g.score === "number" && g.score >= 0 && g.score <= 105);
+        if (!validGrades) return res.status(400).json({ error: "Invalid grades format" });
+        grades.forEach(g => student.grades.push(g));
     }
-  } else {
-    res.status(404).json({ message: 'Student not found' });
-  }
+
+    saveStudents(students);
+    res.json(student);
 });
 
-// GET /students/:id/average - Get average grade for a student
-router.get('/:id/average', (req, res) => {
-  const studentId = req.params.id;
-  const student = students.find(s => s.id === studentId);
-  if (student) {
-    const total = student.grades.reduce((sum, grade) => sum + grade.score, 0);
-    const average = total / student.grades.length;
-    res.json({ average });
-  } else {
-    res.status(404).json({ message: 'Student not found' });
-  }
+// DELETE /students/:id – Delete a student by ID
+router.delete("/:id", (req, res) => {
+  const students = loadStudents();
+  const index = students.findIndex((s) => s.id === req.params.id);
+
+  if (index === -1) return res.status(404).json({ error: "Student not found" });
+
+  const deletedStudent = students.splice(index, 1)[0];
+  saveStudents(students);
+
+  res.json(deletedStudent);
+});
+
+// GET /students/:id/average – Get a student's average grade
+router.get("/:id/average", (req, res) => {
+  const students = loadStudents();
+  const student = students.find((s) => s.id === req.params.id);
+
+  if (!student) return res.status(404).json({ error: "Student not found" });
+
+  const average =
+    student.grades.reduce((sum, g) => sum + g.score, 0) / student.grades.length;
+  res.json({ average });
+});
+
+// GET /students/:id/subjects – Get a student's subjects
+router.get("/:id/subjects", (req, res) => {
+  const students = loadStudents();
+  const student = students.find((s) => s.id === req.params.id);
+
+  if (!student) return res.status(404).json({ error: "Student not found" });
+
+  const subjects = student.grades.map((g) => g.subject);
+  res.json({ subjects });
 });
 
 export default router;
