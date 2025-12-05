@@ -6,7 +6,13 @@ const gradeSchema = new mongoose.Schema({
 });
 
 const studentSchema = new mongoose.Schema({
-  studentId: { type: String, required: true, unique: true, match: /^S2025\d{4}$/ },
+  id: { 
+    type: String, 
+    required: true, 
+    unique: true, 
+    sparse: true,  // Allow only one null value
+    match: /^S2025\d{4}$/ 
+  },
   // TODO: Add graduation year validation
   name: { type: String, required: true },
   grades: [gradeSchema],

@@ -1,22 +1,32 @@
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
 import dotenv from "dotenv";
-import studentRoutes from "./routes/students.js"; // make sure this path is correct
 
+// Load environment variables FIRST, before importing routes
 dotenv.config();
+
+import mongoose from "mongoose";
+import studentRoutes from "./routes/students.js";
+import { createAuthRouter } from "./routes/auth.js";
+import User from "./models/users.js";
+import { authenticationToken } from "./middleware/authMiddleware.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const MONGODB_URI = process.env.MONGODB_URI;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 app.use(cors());
 app.use(express.json());
 
 // -- MongoDB Connection --
 mongoose
-  .connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected successfully"))
   .catch((err) => console.error("MongoDB connection error:", err));
+
+// --- Create Auth Router with Secret ---
+const authRoutes = createAuthRouter(JWT_SECRET);
 
 // --- Helper Functions ---
 
@@ -33,8 +43,9 @@ export { isValidStudentId };
 app.get("/", (req, res) => {
   res.send("Welcome to the Student Grade API!");
 });
+app.use("/auth", authRoutes);
 
-app.use("/students", studentRoutes);
+app.use("/students", authenticationToken, studentRoutes);
 
 // --- Start Server ---
 app.listen(PORT, () => {
